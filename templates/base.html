@@ -1,0 +1,32 @@
+<html>
+    <head>
+        <title>Log Viewer</title>
+        <script>
+         function selectall(self){
+             var chkboxes = document.getElementsByName("item");
+             for(var i=0; i<chkboxes.length;i++){
+                 chkboxes[i].checked = self.checked;
+             }
+         }
+         function checkbox_click(self){
+                if (self.checked == true){
+                    // unfold
+                    alert(self.value);
+
+                    }
+               }
+        </script>
+    </head>
+    <body>
+        <p><input type="checkbox" onclick="selectall(this);" >SelectAll</input></p>
+        <table>
+            {% for node in nodes %}
+            {% for file in node.files %}
+            <tr><td>
+                <input type="checkbox" name="item" value="{{ file.attr }}" onclick="checkbox_click(this);" >
+                <a href="{{ file.url }}">{{ file.path }}</a></input>
+            </td></tr>
+                {% endfor %}
+        {% endfor %}
+    </body>
+</html>
