@@ -15,6 +15,16 @@
 
                     }
                }
+          function delete_button(){
+           var chkboxes = document.getElementsByName("item");
+           var files = []
+           for(var i=0; i<chkboxes.length;i++){
+                 if(chkboxes[i].checked){
+                    files.push(chkboxes[i].value);
+                 }
+             }
+             alert(files);
+          }
         </script>
     </head>
     <body>
@@ -23,10 +33,18 @@
             {% for node in nodes %}
             {% for file in node.files %}
             <tr><td>
-                <input type="checkbox" name="item" value="{{ file.attr }}" onclick="checkbox_click(this);" >
-                <a href="{{ file.url }}">{{ file.path }}</a></input>
+                <input type="checkbox" name="item" value="{{node.addr}}/file?path={{ file.url }}" >
+                {% if "-" in file.attr %}
+                <a href="{{node.addr}}/download?path={{ file.url }}">{{ file.path }}</a></input>
+                {% else %}
+                <a href="/show?path={{ file.url }}&node={{ node.addr }}">{{ file.path }}</a></input>
+                {% endif %}
             </td></tr>
                 {% endfor %}
         {% endfor %}
+        </table>
+        <div>
+        <p><input type="button" onclick="delete_button();" value="Delete"></input></p>
+        </div>
     </body>
 </html>
