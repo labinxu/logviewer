@@ -42,35 +42,56 @@ def isdir(path):
     return content
 
 LOGS = {}
-
+LOG_DIR =  "/home/laxxu/testforflask"
 @app.route("/")
 @app.route('/list')
 def list():
     if LOGS:
         return json.dumps(LOGS)
 
-    path = "/home/laxxu/testforflask"
+    path = LOG_DIR
     if not isdir(path):
         pass
     #return redirect(url_for("download", filename=path))
     p = subprocess.Popen("ls -lh %s" % path, stdout=subprocess.PIPE, shell=True)
     files = []
+    istotal = True
     while True:
         l = p.stdout.readline()
         if not l:
             break
+        if istotal:
+            istotal = False
+            continue
+
         l = l.strip()
         if path in LOGS.keys():
             LOGS[path][l.split(" ")[-1]] = l
         else:
-            LOGS[path] = {}
-        time.sleep(0.5)
+            LOGS[path] = {l.split(" ")[-1]:l}
+
     return json.dumps(LOGS)
 
 @app.route("/file", methods=["GET","POST"])
 def showfile():
     path = request.args.get('path')
     act = request.args.get('act')
+
+def exec_for_log(cmd):
+    app.logger.debug(cmd)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    path = LOG_DIR
+    LOGS = {}
+    while True:
+        l = p.stdout.readline()
+        if not l:
+            break
+        l = l.strip()
+        if path in LOGS.keys():
+            LOGS[path][l.split("/")[-1]] = l
+        else:
+            LOGS[path] = {l.split("/")[-1]:l}
+    return json.dumps(LOGS)
 
 
 @app.route("/show",methods=["GET", "POST"])
@@ -79,13 +100,23 @@ def show():
     if not isdir(path):
         pass
     #return redirect(url_for("download", filename=path))
+    app.logger.debug("ls -lh %s" % path)
     p = subprocess.Popen("ls -lh %s" % path, stdout=subprocess.PIPE, shell=True)
     LOGS = {}
+    i = 0
     while True:
         l = p.stdout.readline()
         if not l:
             break
+        import pdb
+        pdb.set_trace()
+        if i == 0:
+            i = 1
+            app.logger.debug(l)
+            continue
+        
         l = l.strip()
+
         if path in LOGS.keys():
             LOGS[path][l.split(" ")[-1]] = l
         else:
@@ -107,13 +138,16 @@ def download():
     return response
 
 
-@app.route('/search', methods=['POST'])
+@app.route('/search', methods=['GET'])
 def search():
-    pass
+    searchkey = request.args.get('key')
+    search_cmd = "find {0} -name \"{1}\" |xargs ls -lh".format(LOG_DIR,searchkey)
+    return exec_for_log(search_cmd)
+
 
 @app.route("/delete", methods=["GET"])
 def delete():
-    pass
+    return "delete"
 
 
 if __name__ == "__main__":

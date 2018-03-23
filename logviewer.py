@@ -1,6 +1,6 @@
 from flask import url_for, Flask, render_template, request, redirect
 import json, os, sys
-from utils import util_requests
+from utils.util_requests import UtilityRequests
 
 
 app = Flask(__name__, template_folder="templates")
@@ -25,13 +25,16 @@ class Node:
     """
     def __init__(self, addr):
         self.addr = addr
+        self.files = []
+        self.requests = UtilityRequests(domain='')
 
     def list(self):
-        requests = util_requests.UtilityRequests(domain='')
-        app.logger.debug(self.addr)
-        data = requests.getContent(self.addr)
-        jdata = json.loads(data)
-        self.files = []
+        try:
+            data = self.requests.getContent(self.addr)
+            jdata = json.loads(data)
+        except Exception:
+            return
+
         for key, val in jdata.items():
             self.base = key
             for k, v in val.items():
@@ -39,10 +42,26 @@ class Node:
                 self.files.append(f)
             break
 
-        app.logger.debug(self.files)
+    def get_data_with_json(self, url):
+        try:
+            data = self.requests.getContent(url)
+            jdata = json.loads(data)
+        except Exception:
+            app.logger.error("Can not get files from %s" % self.addr)
+            return
+        for key, val in jdata.items():
+            self.base = key
+            for k, v in val.items():
+                f = Item(url=os.path.join(self.base, k), path=v, attr=v[0])
+                self.files.append(f)
+            break
+
+    def search(self, searchkey):
+        url = "%s/search?key=%s" %(self.addr, searchkey)
+        self.get_data_with_json(url)
 
     def show(self, path):
-        requests = util_requests.UtilityRequests(domain='')
+        requests = UtilityRequests(domain='')
         url = "%s/show?path=%s" %(self.addr,path)
         app.logger.debug(url)
         data = requests.getContent(url)
@@ -108,7 +127,15 @@ def show():
     node.show(path)
     return render_template("base.html",nodes=[node])
 
-
+@app.route("/search", methods=["GET"])
+def search():
+    searchkey = request.args.get('key')
+    app.logger.debug("in search GET: %s" % searchkey)
+    nodes = []
+    for node in logviewer.nodeMgr.get_nodes():
+        node.search(searchkey)
+        nodes.append(node)
+    return render_template("base.html", nodes=nodes)
 
 @app.route("/download", methods=["GET", "POST"])
 def download():
@@ -120,5 +147,5 @@ def download():
 if __name__ == "__main__":
     app.debug = True
     logviewer = LogViewer()
-    
+
     app.run(port=8080)

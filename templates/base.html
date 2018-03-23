@@ -1,35 +1,92 @@
 <html>
     <head>
         <title>Log Viewer</title>
-        <script>
+        <script type=text/javascript src="{{ url_for('static', filename='jquery-3.3.1.min.js') }}"></script>
+        <script type="text/javascript">
+         $(function() {
+
+             $("#delete_bt").bind('click', function() {
+                 alert("delete_bt");
+                 $.ajax({
+                     url: "http://127.0.0.1:8000/delete",
+                     type: "POST",
+                     dataType: "json",
+                     data:["f1","f2"],
+             　　    success: function (res)
+                     　　    {
+                         alert(res);
+                         　　   },
+                     　　    error: function (error) { 
+                         　　　　     alert(JSON.stringify(error));  //这个地方也用到了
+                         　　    } 
+                 });
+                 /* var checkedboxes = new Array();
+                  * $('#item').each(function(){
+                  *     if ($(this).checked){
+                  *         checkedboxes.push($(this).val());
+                  *     }
+                  * }); */
+             });
+
+             $("#download_bt").bind("click", function(){
+                 alert("download_bt");
+             });
+
+         });
+
          function selectall(self){
              var chkboxes = document.getElementsByName("item");
              for(var i=0; i<chkboxes.length;i++){
                  chkboxes[i].checked = self.checked;
              }
+
          }
          function checkbox_click(self){
-                if (self.checked == true){
-                    // unfold
-                    alert(self.value);
+             if (self.checked == true){
+                 // unfold
+                 alert(self.value);
 
-                    }
-               }
-          function delete_button(){
-           var chkboxes = document.getElementsByName("item");
-           var files = []
-           for(var i=0; i<chkboxes.length;i++){
+             }
+         }
+         function delete_button(){
+             var chkboxes = document.getElementsByName("item");
+             var files = []
+             for(var i=0; i<chkboxes.length;i++){
                  if(chkboxes[i].checked){
-                    files.push(chkboxes[i].value);
+                     files.push(chkboxes[i].value);
                  }
              }
              alert(files);
-          }
+         }
+
+         function search_button(text_id){
+             var search_text = document.getElementById(text_id);
+             window.location.href="search?key="+search_text.value;
+             /* 
+              *              var search_text = document.getElementById(text_id);
+              *              var myform = document.createElement("form");
+              *              myform.method = "post";
+              *              myform.action = "/search";
+              *              var input = document.createElement("input");
+              *              input.setAttribute("name","searchtext");
+              *              input.setAttribute("value", search_text.value);
+                     *              myform.appendChild(input);
+                     *              document.body.appendChild(input);
+                     *              myform.submit()
+                     *              alert(search_text.value); */
+                 }
         </script>
     </head>
     <body>
-        <p><input type="checkbox" onclick="selectall(this);" >SelectAll</input></p>
-        <table>
+    <div id="main_frame" align="center" style="float:center">
+      <table name="action_table">
+        <tr>
+          <td><input type="text" id="search_text"></input></td>
+          <td><input type="button" value="Search" onclick="search_button('search_text');"></input></td>
+          <td><input type="checkbox" onclick="selectall(this);" >SelectAll</input></td>
+        </tr>
+      </table>
+      <table>
             {% for node in nodes %}
             {% for file in node.files %}
             <tr><td>
@@ -40,11 +97,15 @@
                 <a href="/show?path={{ file.url }}&node={{ node.addr }}">{{ file.path }}</a></input>
                 {% endif %}
             </td></tr>
-                {% endfor %}
-        {% endfor %}
+             {% endfor %}
+             {% endfor %}
         </table>
-        <div>
-        <p><input type="button" onclick="delete_button();" value="Delete"></input></p>
+        <table>
+        <tr>
+        <td><input type="button"  value="Delete" id="delete" onclick="delete_button();"></input></td>
+        <td><input type="button"  value="Download" id="delete_bt"></input></td>
+        </tr>
+        </table>
         </div>
     </body>
 </html>

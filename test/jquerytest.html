@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>对复选框组的全选操作</title>
+        <script src="../static/jquery-3.3.1.min.js" type="text/javascript"></script>
+        <script type="text/javascript">
+         $(function(){
+             /*全选
+                全选cheched和下方的checkbox按钮的checked是一致的，
+                故可用this.checked。
+                注意：$(this).checked是错的
+              */
+             $('#checkedAll').click(function() {
+                 $('[name=item]:checkbox').prop('checked', this.checked);
+             });
+
+             /*判断复选框的总数，是否和选中的复选框的数量相等
+                相等：全选了
+                不相等：没有全选
+              */
+             $('[name=item]:checkbox').click(function() {
+                 /*得到的是ul下 name=item 的复选框数组*/
+                 var $checkedArray = $('[name=item]:checkbox');
+                 /*$checkedArray.filter(':checked') -----> 已经选择的复选框 */
+                 $('#checkedAll').prop('checked',$checkedArray.length==$checkedArray.filter(':checked').length);
+                 　　　　　　　　　　　　
+             });
+         });
+        </script>
+        <script type="text/javascript">
+         $(function () {
+             //获取已选的复选框的值
+             var checkedArray = new Array();//放已经选择的checkbox的value
+             var count;//已经选择的个数
+             $('#btn_submit').click(function() {
+                 checkedArray.length=0;
+                 count=0;
+                 $('[name=item]:checkbox:checked').each(function() {
+                     checkedArray.push($(this).val());
+                     count++;
+                 });
+                 if (checkedArray.length==0) {
+                     alert("Please check one at least.");
+                     return;
+                 }
+                 confirm("已选复选框的值："+checkedArray+"\n"+"选中的复选框个数："+count);
+             });
+         })
+        </script>
+    </head>
+    <body>
+        <table>
+<tr>
+        <input type="checkbox" id="checkedAll"><label for="checkedAll">全选</label>
+        <ul>
+            <li><input type="checkbox" name="item" value="basketball">篮球</li>
+            <li><input type="checkbox" name="item" value="football">足球</li>
+            <li><input type="checkbox" name="item" value="badminton">羽毛球</li>
+            <li><input type="checkbox" name="item" value="pingpong">兵乓球</li>
+            <li><input type="checkbox" name="item" value="swimming">游泳</li>
+            <li><input type="checkbox" name="item" value="running">跑步</li>
+        </ul>
+</tr></table>
+        <button type="button" id="btn_submit" value="提交button">提交</button>
+        
+    </body>
+</html>
