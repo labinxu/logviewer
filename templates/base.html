@@ -5,31 +5,47 @@
         <script type="text/javascript">
          $(function() {
 
-             $("#delete_bt").bind('click', function() {
-                 alert("delete_bt");
+             $("#download_bt").bind("click", function(){
+                 var chkboxes = document.getElementsByName("item");
+                 var data = {};
+                 for(var i=0; i<chkboxes.length;i++){
+                     if(chkboxes[i].checked){
+                         if(data[chkboxes[i].id] ){
+                             data[chkboxes[i].id].push(chkboxes[i].value);
+                         }
+                         else{
+                             data[chkboxes[i].id] = [];
+                             data[chkboxes[i].id].push(chkboxes[i].value)
+                         }
+                     }
+                 }
+
                  $.ajax({
-                     url: "http://127.0.0.1:8000/delete",
+                     url: "http://127.0.0.1:8080/download",
                      type: "POST",
                      dataType: "json",
-                     data:["f1","f2"],
-             　　    success: function (res)
-                     　　    {
-                         alert(res);
-                         　　   },
-                     　　    error: function (error) { 
-                         　　　　     alert(JSON.stringify(error));  //这个地方也用到了
-                         　　    } 
-                 });
-                 /* var checkedboxes = new Array();
-                  * $('#item').each(function(){
-                  *     if ($(this).checked){
-                  *         checkedboxes.push($(this).val());
-                  *     }
-                  * }); */
-             });
+                     data:JSON.stringify(data),
+                     success: function (res){
+                         alert("Success");
+                         $("#select_all")[0].checked=false;
+                         for(var i=0; i<chkboxes.length;i++){
+                             if(chkboxes[i].checked){
+                                 chkboxes[i].checked = false;
+                             }
 
-             $("#download_bt").bind("click", function(){
-                 alert("download_bt");
+                         }
+                         for(var key in res){
+                             window.open(res[key])
+                         }
+
+
+                     },
+                     error: function (error){
+                         alert("error");
+                         alert(JSON.stringify(error));
+                     }
+                 });
+
              });
 
          });
@@ -39,6 +55,7 @@
              for(var i=0; i<chkboxes.length;i++){
                  chkboxes[i].checked = self.checked;
              }
+
 
          }
          function checkbox_click(self){
@@ -50,31 +67,44 @@
          }
          function delete_button(){
              var chkboxes = document.getElementsByName("item");
-             var files = []
+             var data = {};
              for(var i=0; i<chkboxes.length;i++){
                  if(chkboxes[i].checked){
-                     files.push(chkboxes[i].value);
+                     if(data[chkboxes[i].id] ){
+                         data[chkboxes[i].id].push(chkboxes[i].value);
+                     }
+                     else{
+                         data[chkboxes[i].id] = [];
+                         data[chkboxes[i].id].push(chkboxes[i].value)
+                     }
                  }
              }
-             alert(files);
+             $.ajax({
+                 url: "http://127.0.0.1:8080/delete",
+                 type: "POST",
+                 dataType: "json",
+                 data:JSON.stringify(data),
+                 success: function (res){
+                     alert("Success");
+                     $("#select_all")[0].checked=false;
+                     for(var i=0; i<chkboxes.length;i++){
+                         if(chkboxes[i].checked){
+                             chkboxes[i].checked = false;
+                         }
+                     }
+
+                 },
+                 error: function (error){
+                     alert("error");
+                     alert(JSON.stringify(error));
+                 }
+             });
          }
 
          function search_button(text_id){
              var search_text = document.getElementById(text_id);
              window.location.href="search?key="+search_text.value;
-             /* 
-              *              var search_text = document.getElementById(text_id);
-              *              var myform = document.createElement("form");
-              *              myform.method = "post";
-              *              myform.action = "/search";
-              *              var input = document.createElement("input");
-              *              input.setAttribute("name","searchtext");
-              *              input.setAttribute("value", search_text.value);
-                     *              myform.appendChild(input);
-                     *              document.body.appendChild(input);
-                     *              myform.submit()
-                     *              alert(search_text.value); */
-                 }
+         }
         </script>
     </head>
     <body>
@@ -83,14 +113,14 @@
         <tr>
           <td><input type="text" id="search_text"></input></td>
           <td><input type="button" value="Search" onclick="search_button('search_text');"></input></td>
-          <td><input type="checkbox" onclick="selectall(this);" >SelectAll</input></td>
+          <td><input type="checkbox" id="select_all" onclick="selectall(this);" >SelectAll</input></td>
         </tr>
       </table>
       <table>
             {% for node in nodes %}
             {% for file in node.files %}
             <tr><td>
-                <input type="checkbox" name="item" value="{{node.addr}}/file?path={{ file.url }}" >
+                <input type="checkbox" name="item" id="{{node.addr}}" value="{{ file.url }}" >
                 {% if "-" in file.attr %}
                 <a href="{{node.addr}}/download?path={{ file.url }}">{{ file.path }}</a></input>
                 {% else %}
@@ -103,7 +133,7 @@
         <table>
         <tr>
         <td><input type="button"  value="Delete" id="delete" onclick="delete_button();"></input></td>
-        <td><input type="button"  value="Download" id="delete_bt"></input></td>
+        <td><input type="button"  value="Download" id="download_bt"></input></td>
         </tr>
         </table>
         </div>

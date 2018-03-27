@@ -23,12 +23,23 @@ class Node:
     address or port
     files
     """
-    def __init__(self, addr):
+    def __init__(self, addr, files=[]):
         self.addr = addr
-        self.files = []
+        self.files = files
         self.requests = UtilityRequests(domain='')
 
+    def delete(self, files):
+        app.logger.warning("delete %s" % str(files))
+        url = ("%s/delete") % self.addr
+        self.requests.post(url,data=json.dumps(files))
+
+    def download(self):
+        response = self.requests.post("%s/download" % self.addr, data=json.dumps(self.files))
+        app.logger.warning(response.content)
+        return json.loads(response.content)["file"]
+
     def list(self):
+        self.files = []
         try:
             data = self.requests.getContent(self.addr)
             jdata = json.loads(data)
@@ -100,30 +111,44 @@ class LogViewer():
     """
     Init the node configure
     """
-    nodeMgr = ''
+    Nodes = {}
+    @classmethod
+    def create_node(cls, nodeaddr):
+        if not nodeaddr in cls.Nodes:
+            n = Node(nodeaddr)
+            cls.Nodes[nodeaddr] = n
+            return n
+        else:
+            return cls.Nodes[nodeaddr]
+
+
     def __init__(self):
         """
         init the node infor from the configure file
         """
-        app.logger.error("init LogViewer")
+        app.logger.warning("init LogViewer")
         with open("./config","r") as f:
-            nodes = json.loads(f.read().replace('\n',''))
-            LogViewer.nodeMgr = NodeMgr(nodes)
+            self.nodes_addrs = json.loads(f.read().replace('\n',''))
 
-    @app.route("/")
-    @app.route("/list")
-    def list():
-        nodes = []
-        for node in LogViewer.nodeMgr.get_nodes():
-            node.list()
-            nodes.append(node)
-        return render_template("base.html",nodes=nodes)
+
+logviewer = LogViewer()
+
+
+@app.route("/")
+@app.route("/list")
+def list():
+    nodes = []
+    for addr in logviewer.nodes_addrs:
+        node = logviewer.create_node(addr)
+        node.list()
+        nodes.append(node)
+    return render_template("base.html",nodes=nodes)
 
 @app.route("/show", methods=['GET'])
 def show():
     path = request.args.get('path')
     n = request.args.get('node')
-    node = LogViewer.nodeMgr.nodes[n]
+    node = logviewer.create_node(n)
     node.show(path)
     return render_template("base.html",nodes=[node])
 
@@ -137,15 +162,39 @@ def search():
         nodes.append(node)
     return render_template("base.html", nodes=nodes)
 
-@app.route("/download", methods=["GET", "POST"])
+@app.route("/delete", methods=["POST"])
+def delete():
+    data = request.get_data()
+    app.logger.debug(data)
+    jdata = json.loads(data)
+
+    for nodeaddr, files in jdata.items():
+        node = LogViewer.create_node(nodeaddr)
+        node.delete(files)
+    return json.dumps({'status':'ok'})
+
+@app.route("/download", methods=["POST"])
 def download():
-    filepath = request.args.get("path")
-    app.logger.debug("Download file %s" % filepath)
-    url = request.args.get('addr')
-    return redirect(url_for(url+"/download", filename=filepath))
+    if request.method == "POST":
+        data = request.get_data()
+        app.logger.debug(data)
+        jdata = json.loads(data)
+        data = {}
+        for n , files in jdata.items():
+            node = Node(n, files)
+            filepath = node.download()
+            app.logger.debug(filepath)
+            data[n] = "%s/download?path=%s" % (n, filepath)
+
+        return json.dumps(data.values())
+    else:
+        filepath = request.args.get("path")
+        app.logger.debug("Download file %s" % filepath)
+        url = request.args.get('addr')
+        return redirect(url_for(url+"/download", filename=filepath))
 
 if __name__ == "__main__":
     app.debug = True
-    logviewer = LogViewer()
+
 
     app.run(port=8080)
