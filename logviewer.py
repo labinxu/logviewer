@@ -62,9 +62,7 @@ class Node:
             return
         for key, val in jdata.items():
             self.base = key
-            for k, v in val.items():
-                f = Item(url=os.path.join(self.base, k), path=v, attr=v[0])
-                self.files.append(f)
+            self.files = [Item(url=os.path.join(self.base, k), path=v, attr=v[0]) for k, v in val.items()]
             break
 
     def search(self, searchkey):
@@ -111,25 +109,26 @@ class LogViewer():
     """
     Init the node configure
     """
-    Nodes = {}
-    @classmethod
-    def create_node(cls, nodeaddr):
-        if not nodeaddr in cls.Nodes:
+
+    def create_node(self, nodeaddr):
+        if not nodeaddr in self.nodes:
             n = Node(nodeaddr)
-            cls.Nodes[nodeaddr] = n
+            self.nodes[nodeaddr] = n
             return n
         else:
-            return cls.Nodes[nodeaddr]
+            return self.nodes[nodeaddr]
 
 
     def __init__(self):
         """
         init the node infor from the configure file
         """
+        self.nodes = {}
         app.logger.warning("init LogViewer")
         with open("./config","r") as f:
             self.nodes_addrs = json.loads(f.read().replace('\n',''))
-
+            for node in self.nodes_addrs:
+                self.create_node(node)
 
 logviewer = LogViewer()
 
@@ -138,8 +137,7 @@ logviewer = LogViewer()
 @app.route("/list")
 def list():
     nodes = []
-    for addr in logviewer.nodes_addrs:
-        node = logviewer.create_node(addr)
+    for node in logviewer.nodes.itervalues():
         node.list()
         nodes.append(node)
     return render_template("base.html",nodes=nodes)
@@ -157,7 +155,7 @@ def search():
     searchkey = request.args.get('key')
     app.logger.debug("in search GET: %s" % searchkey)
     nodes = []
-    for node in logviewer.nodeMgr.get_nodes():
+    for node in logviewer.nodes.itervalues():
         node.search(searchkey)
         nodes.append(node)
     return render_template("base.html", nodes=nodes)

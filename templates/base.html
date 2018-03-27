@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title>Log Viewer</title>
+        <title>vNLS_LOG_TRANSTER</title>
         <script type=text/javascript src="{{ url_for('static', filename='jquery-3.3.1.min.js') }}"></script>
         <script type="text/javascript">
          $(function() {
@@ -15,7 +15,7 @@
                          }
                          else{
                              data[chkboxes[i].id] = [];
-                             data[chkboxes[i].id].push(chkboxes[i].value)
+                             data[chkboxes[i].id].push(chkboxes[i].value);
                          }
                      }
                  }
@@ -26,7 +26,6 @@
                      dataType: "json",
                      data:JSON.stringify(data),
                      success: function (res){
-                         alert("Success");
                          $("#select_all")[0].checked=false;
                          for(var i=0; i<chkboxes.length;i++){
                              if(chkboxes[i].checked){
@@ -35,7 +34,7 @@
 
                          }
                          for(var key in res){
-                             window.open(res[key])
+                             window.open(res[key]);
                          }
 
 
@@ -58,13 +57,7 @@
 
 
          }
-         function checkbox_click(self){
-             if (self.checked == true){
-                 // unfold
-                 alert(self.value);
 
-             }
-         }
          function delete_button(){
              var chkboxes = document.getElementsByName("item");
              var data = {};
@@ -75,7 +68,7 @@
                      }
                      else{
                          data[chkboxes[i].id] = [];
-                         data[chkboxes[i].id].push(chkboxes[i].value)
+                         data[chkboxes[i].id].push(chkboxes[i].value);
                      }
                  }
              }
@@ -103,6 +96,12 @@
 
          function search_button(text_id){
              var search_text = document.getElementById(text_id);
+             alert(search_text.value);
+             if (search_text.value == ""){
+                 alert("Empth search key string");
+                 return;
+             }
+
              window.location.href="search?key="+search_text.value;
          }
         </script>
