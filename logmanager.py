@@ -5,13 +5,20 @@ import subprocess, flask, time
 from flask import Flask, request, make_response, redirect, url_for
 import mimetypes, json, os
 import zipfile, time
-
-
-HOST = "127.0.0.1"
-PORT = 8000
+import optparse
 
 
 app = Flask(__name__)
+
+
+def commandline():
+    parser = optparse.OptionParser()
+    parser.add_option('-H', '--host', dest="hostname", default="127.0.0.1", help="host adress default is :17.0.0.1")
+    parser.add_option('-P', '--port', dest="port", default=8000, help="port NO. default is 8000")
+    parser.add_option("-D", '--debug', action="store_true", dest="debug", help="run with debug mode")
+    parser.add_option('-F', '--folder', dest="folder", default="/home/laxxu/testforflask", help="nls logs folder")
+    return parser.parse_args()
+
 
 #hostname = os.system("")
 class FileManager():
@@ -46,8 +53,8 @@ def isdir(path):
     content = p.stdout.readlines()
     return content
 
-LOGS = {}
-LOG_DIR =  "/home/laxxu/testforflask"
+LOG_DIR =  "~"
+
 @app.route("/")
 @app.route('/list')
 def list():
@@ -119,7 +126,6 @@ def show():
         l = p.stdout.readline()
         if not l:
             break
-
         if i == 0:
             i = 1
             app.logger.debug(l)
@@ -147,15 +153,6 @@ def download():
             zipf.write(f)
         zipf.close()
         return json.dumps({'file': filepath})
-
-        # with open(filepath, 'r') as zipf:
-        #     response = make_response(zipf.read())
-        #     mime_type = mimetypes.guess_type(filepath)[0]
-        #     response.headers["Content-Type"] = mime_type
-        #     response.headers["Content-Disposition"] = \
-        #                     "attachment;filename=%s" % filepath.split("/")[-1]
-        #     return response
-
 
     else:
         filepath = request.args.get("path")
@@ -192,6 +189,8 @@ def delete():
 
 
 if __name__ == "__main__":
-    app.debug = True
-    app.run(port=8000)
+    opt, args = commandline()
+    app.logger.debug(opt)
+    LOG_DIR = opt.folder
+    app.run(host=opt.hostname, port=int(opt.port), debug=opt.debug)
 

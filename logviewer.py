@@ -1,7 +1,31 @@
 from flask import url_for, Flask, render_template, request, redirect
 import json, os, sys
 from utils.util_requests import UtilityRequests
+import multiprocessing, optparse
+from multiprocessing import Process
 
+##############################################################
+#### pickle error workround
+import types
+import copy_reg
+def _pickle_method(m):
+    """fixed pickle error"""
+    if m.im_self is None:
+        return getattr, (m.im_class, m.im_func.func_name)
+    else:
+        return getattr, (m.im_self, m.im_func.func_name)
+
+copy_reg.pickle(types.MethodType, _pickle_method)
+##############################################################
+
+
+def commandline():
+    parser = optparse.OptionParser()
+    parser.add_option('-H', '--hostname',dest='hostname',default="127.0.0.1", help="host server ip")
+    parser.add_option('-P', '--port', dest="port", default=8080, type=int, help="port for host")
+    parser.add_option('-n', '--node', dest='node', help="view the node nls logs split with ','")
+    parser.add_option("-D", '--debug', action="store_true", dest="debug", help="run with debug mode")
+    return parser.parse_args()
 
 app = Flask(__name__, template_folder="templates")
 
@@ -10,9 +34,6 @@ class Item():
     file information
     path,attr
     """
-    url = "url"
-    path = "path"
-    attr = "folder"
     def __init__(self, url, path, attr):
         self.url = url
         self.path = path
@@ -39,11 +60,13 @@ class Node:
         return json.loads(response.content)["file"]
 
     def list(self):
+        """get the files from the node"""
         self.files = []
         try:
             data = self.requests.getContent(self.addr)
             jdata = json.loads(data)
-        except Exception:
+        except Exception as e:
+            app.logger.error(e)
             return
 
         for key, val in jdata.items():
@@ -51,7 +74,7 @@ class Node:
             for k, v in val.items():
                 f = Item(url=os.path.join(self.base, k), path=v, attr=v[0])
                 self.files.append(f)
-            break
+        return self
 
     def get_data_with_json(self, url):
         try:
@@ -62,12 +85,14 @@ class Node:
             return
         for key, val in jdata.items():
             self.base = key
-            self.files = [Item(url=os.path.join(self.base, k), path=v, attr=v[0]) for k, v in val.items()]
-            break
+            self.files.extend([Item(url=os.path.join(self.base, k),
+                                    path=v, attr=v[0]) for k, v in val.items()])
+
 
     def search(self, searchkey):
         url = "%s/search?key=%s" %(self.addr, searchkey)
         self.get_data_with_json(url)
+        return self
 
     def show(self, path):
         requests = UtilityRequests(domain='')
@@ -84,26 +109,8 @@ class Node:
                 self.files.append(f)
             break
 
-        app.logger.debug(self.files)
+        return self
 
-class NodeMgr:
-    """
-    Node information manager
-    ip:port
-    """
-    def __init__(self, nodesinfo):
-        for node in nodesinfo:
-            app.logger.debug("node address %s" % node["addr"])
-        self.nodesinfo = nodesinfo
-        self.nodes = {}
-
-    def get_nodes(self):
-        for node in self.nodesinfo:
-            self.nodes[node['addr']] = Node(node["addr"])
-        return self.nodes.values()
-
-    def update(self):
-        pass
 
 class LogViewer():
     """
@@ -118,8 +125,10 @@ class LogViewer():
         else:
             return self.nodes[nodeaddr]
 
-
     def __init__(self):
+        self.nodes = {}
+
+    def init_nodes(self):
         """
         init the node infor from the configure file
         """
@@ -130,16 +139,21 @@ class LogViewer():
             for node in self.nodes_addrs:
                 self.create_node(node)
 
-logviewer = LogViewer()
-
+logviewer = None
 
 @app.route("/")
 @app.route("/list")
 def list():
+    pool = multiprocessing.Pool(4)
+    result = []
+
+    for n in logviewer.nodes.itervalues():
+        result.append(pool.apply_async(n.list))
+    pool.close()
+    pool.join()
     nodes = []
-    for node in logviewer.nodes.itervalues():
-        node.list()
-        nodes.append(node)
+    for res in result:
+        nodes.append(res.get())
     return render_template("base.html",nodes=nodes)
 
 @app.route("/show", methods=['GET'])
@@ -165,9 +179,10 @@ def delete():
     data = request.get_data()
     app.logger.debug(data)
     jdata = json.loads(data)
-
+    import pdb
+    pdb.set_trace()
     for nodeaddr, files in jdata.items():
-        node = LogViewer.create_node(nodeaddr)
+        node = logviewer.create_node(nodeaddr)
         node.delete(files)
     return json.dumps({'status':'ok'})
 
@@ -192,7 +207,16 @@ def download():
         return redirect(url_for(url+"/download", filename=filepath))
 
 if __name__ == "__main__":
-    app.debug = True
-
-
-    app.run(port=8080)
+    logviewer = LogViewer()
+    opt,_ = commandline()
+    app.logger.debug(opt)
+    hostname = opt.hostname
+    port = opt.port
+    debug = opt.debug
+    nodes = '' if not opt.node else opt.node.split(',')
+    if nodes:
+        for n in nodes:
+            logviewer.create_node(n)
+    else:
+        logviewer.init_nodes()
+    app.run(host=hostname, port=port, debug=debug)
