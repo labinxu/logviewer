@@ -181,7 +181,6 @@ def delete():
     app.logger.warning(delete_cmd)
     try:
         pass
-        #exec_with_status(delete_cmd)
     except Exception as e:
         pass
 
