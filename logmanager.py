@@ -10,6 +10,9 @@ import optparse
 
 app = Flask(__name__)
 
+global CUR_PATH
+global DEFAULT_PATH
+
 
 def commandline():
     parser = optparse.OptionParser()
@@ -53,15 +56,28 @@ def isdir(path):
     content = p.stdout.readlines()
     return content
 
-LOG_DIR =  "~"
+def exec_with_result(cmdline):
+    """create new process to run the commandline
+    and return the stdout data"""
+
+    p = subprocess.Popen(cmdline, stdout=subprocess.PIPE, shell=True)
+    result = []
+    while True:
+        l = p.stdout.readline()
+        if not l:
+            break;
+        result.append(l.strip())
+    return result
+
 
 @app.route("/")
 @app.route('/list')
+@app.route("/ls")
 def list():
     # if LOGS:
     #     return json.dumps(LOGS)
     LOGS = {}
-    path = LOG_DIR
+    path = CUR_PATH
     if not isdir(path):
         pass
     #return redirect(url_for("download", filename=path))
@@ -92,7 +108,7 @@ def showfile():
 def exec_for_log(cmd):
     app.logger.debug(cmd)
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-    path = LOG_DIR
+    path = CUR_PATH
     LOGS = {}
     while True:
         l = p.stdout.readline()
@@ -140,7 +156,36 @@ def show():
         time.sleep(0.5)
     return json.dumps(LOGS)
 
+@app.route("/pwd", methods=["GET"])
+def pwd():
+    print("CUR_PATH %s" % CUR_PATH)
+    return CUR_PATH
+
+@app.route("/exe", methods=["GET"])
+def exe():
+    cmdline = request.args.get('cmd')
+    output = exec_with_result(cmdline)
+    return json.dumps(output)
+
+@app.route("/cd", methods=["GET"])
+def cd():
+    global CUR_PATH
+    global DEFAULT_PATH
+
+    path = request.args.get('path')
+    if "~" in path:
+        CUR_PATH = DEFAULT_PATH
+    elif ".." in path:
+        CUR_PATH =  CUR_PATH[0:-1] if CUR_PATH[-1] == '/' else CUR_PATH
+        CUR_PATH = "/".join(CUR_PATH.split('/')[0:-1])
+    else:
+        CUR_PATH = os.path.join(CUR_PATH, path)
+
+    app.logger.debug('Current Path %s', CUR_PATH)
+    return CUR_PATH
+
 @app.route("/download", methods=["GET", "POST"])
+@app.route("/cp", methods=["GET", "POST"])
 def download():
     if request.method == "POST":
         data = request.get_data()
@@ -153,9 +198,11 @@ def download():
             zipf.write(f)
         zipf.close()
         return json.dumps({'file': filepath})
-
     else:
         filepath = request.args.get("path")
+        if not filepath:
+            filepath = os.path.join(CUR_PATH, request.args.get("file"))
+
         app.logger.debug("Download file %s" % filepath)
         with open(filepath.encode('utf-8'), 'r') as f:
             response = make_response(f.read())
@@ -169,8 +216,22 @@ def download():
 @app.route('/search', methods=['GET'])
 def search():
     searchkey = request.args.get('key')
-    search_cmd = "find {0} -name \"{1}\" |xargs ls -lh".format(LOG_DIR,searchkey)
+    search_cmd = "find {0} -name \"{1}\" |xargs ls -lh".format(CUR_PATH,searchkey)
     return exec_for_log(search_cmd)
+
+@app.route("/rm", methods=["POST"])
+def rm():
+    data = request.get_data()
+    files = json.loads(data)
+    files = [os.path.join(CUR_PATH, f) for f in files]
+    delete_cmd = "rm -rf %s" % " ".join(files)
+    app.logger.debug(files)
+    try:
+        exec_with_status(delete_cmd)
+    except Exception as e:
+        pass
+    return list()
+
 
 @app.route("/delete", methods=["POST"])
 def delete():
@@ -181,15 +242,21 @@ def delete():
     app.logger.warning(delete_cmd)
     try:
         pass
+        #exec_with_status(delete_cmd)
     except Exception as e:
         pass
-
-    return json.dumps({'status':'ok'})
+    return list()
 
 
 if __name__ == "__main__":
+    global CUR_PATH
+    global DEFAULT_PATH
+    CUR_PATH = "~"
+    DEFAULT_PATH = "~"
+
     opt, args = commandline()
     app.logger.debug(opt)
-    LOG_DIR = opt.folder
+    CUR_PATH = opt.folder
+    DEFAULT_PATH = opt.folder
     app.run(host=opt.hostname, port=int(opt.port), debug=opt.debug)
 

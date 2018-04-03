@@ -1,5 +1,11 @@
 import requests
 import platform
+import logging
+
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 
 if platform.system() == 'Windows':
     from requests_ntlm import HttpNtlmAuth
@@ -24,7 +30,7 @@ class UtilityRequests():
         self.session.headers = headers
 
     def makeNtlmAuth(self, username, password):
-        print('[+] Make HttpNtlmAuth %s' % username)
+        logger.debug('[+] Make HttpNtlmAuth %s' % username)
         auth = HttpNtlmAuth('%s\\%s' % (self.domain, username),
                             password, self.session)
 
@@ -42,7 +48,7 @@ class UtilityRequests():
         return self.get(url).content
 
     def get(self, url):
-        print('[+] Get: %s' % url)
+        logger.debug('[+] Get: %s' % url)
         return self.session.get(url, auth=self.auth, verify=False)
 
     def getSoup(self, url):
@@ -50,7 +56,7 @@ class UtilityRequests():
         return BeautifulSoup(r.text.encode('utf-8'), 'html.parser')
 
     def post(self, url, data):
-        print('[+] Post %s' % url)
+        logger.debug('[+] Post %s' % url)
         return self.session.post(url,data=data)
 
     def postSoup(self, url, data):
