@@ -42,9 +42,9 @@ def init_nls_info(node=None):
     if not node:
         nls_run_info = read_nls_info()
         nodes = nls_run_info['nls_nodes']
-
         url = nls_run_info["nls_active_node"]
         # get the default pwd
+        pwd = ''
         try:
             pwd = connector.getContent(os.path.join(url, "pwd"))
         except Exception as e:
@@ -53,12 +53,14 @@ def init_nls_info(node=None):
                 for node in nodes:
                     url = node
                     try:
-                        pwd = connector.getContent(os.path.join(url, "pwd"))
+                        url = os.path.join(url, "pwd")
+                        pwd = connector.getContent(url)
                     except Exception as er:
                         continue
                     nls_run_info["nls_active_node"] = node
                     active = True
                     break
+                break
 
         logger.debug('PWD %s' % pwd)
         nls_run_info['nls_pwd'] = pwd
@@ -149,7 +151,8 @@ def remote_cmd(args):
     cmd = "exe"
     params = ' '.join(args.args)
     data = run_remote_cmd(cmd, args=params)
-    print(data)
+    for l in json.loads(data):
+        print(l)
 
 @NLSLOG_CMD
 def nodes(args):

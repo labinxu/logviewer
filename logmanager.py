@@ -59,7 +59,7 @@ def isdir(path):
 def exec_with_result(cmdline):
     """create new process to run the commandline
     and return the stdout data"""
-
+    app.logger.debug(cmdline)
     p = subprocess.Popen(cmdline, stdout=subprocess.PIPE, shell=True)
     result = []
     while True:
@@ -163,8 +163,8 @@ def pwd():
 
 @app.route("/exe", methods=["GET"])
 def exe():
-    cmdline = request.args.get('cmd')
-    output = exec_with_result(cmdline)
+    cmdline = request.args.get('cmdline')
+    output = exec_with_result('cd %s && %s'%(CUR_PATH, cmdline))
     return json.dumps(output)
 
 @app.route("/cd", methods=["GET"])
