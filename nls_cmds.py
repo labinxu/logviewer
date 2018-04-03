@@ -19,6 +19,8 @@ subparsers = parser.add_subparsers(title='subcommands',
                                        help='additional help',
                                        dest='subcmd')
 CMDS = []
+REMOTE_CMDS = ['find']
+LOCAL_CMDS = ['vi', 'vim']
 
 def read_nls_info():
     with open(os.path.join(os.environ['HOME'],".nlslog"), 'r') as f:
@@ -84,6 +86,22 @@ def get_from_node(cmd, args=None, node=None):
         logger.error(str(e))
     return data
 
+def run_remote_cmd(cmd, args=None, node=None):
+    if not node:
+        url = os.path.join(NLSINFO["nls_active_node"], cmd)
+    else:
+        url = os.path.join(node, cmd)
+
+    params = '?cmdline=%s' % args if args else ''
+    data = None
+    try:
+        data = connector.getContent('%s%s'%(url, params))
+    except Exception as e:
+        logger.error(str(e))
+    return data
+
+
+
 def post_from_node(cmd, data):
     url = os.path.join(NLSINFO["nls_active_node"], cmd)
     params = json.dumps(data)
@@ -125,6 +143,13 @@ def ls(args):
                 print(f)
             break
 
+@NLSLOG_CMD
+def remote_cmd(args):
+    """find command run on nodes"""
+    cmd = "exe"
+    params = ' '.join(args.args)
+    data = run_remote_cmd(cmd, args=params)
+    print(data)
 
 @NLSLOG_CMD
 def nodes(args):

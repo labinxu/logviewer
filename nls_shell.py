@@ -3,6 +3,7 @@ import shlex, json
 import os, json
 import nls_cmds
 import threading
+
 # from evdev import InputDevice
 # from select import select
 """.nlslog store the runtime value
@@ -22,8 +23,6 @@ nls_run_info = {
 #         select([dev], [], [])
 #         for event in dev.read():
 #             print("code: %s value:%s" % (event.code, event.value))
-
-
 
 def init_environ():
     """init the configure values"""
@@ -70,15 +69,24 @@ def shell_loop():
             sys.stdout.flush()
             continue
         cc = tokenize(cmd)
-
-        if cc[0] not in nls_cmds.CMDS:
-            print('RUN %s' % cmd)
+        ccmd = cc[0].lower()
+        import pdb
+        pdb.set_trace()
+        # local cmds like vi/vim /emacs
+        if ccmd in nls_cmds.LOCAL_CMDS:
             cmd_tokens = tokenize(cmd)
             t = threading.Thread(target=execute, args=(cc, ) )
             t.start()
             t.join()
+
+        # the complex command like find . | grep 
+        elif ccmd in nls_cmds.REMOTE_CMDS:
+            cc.insert(0, "remote_cmd")
+            t = threading.Thread(target=nls_cmds.main, args=(cc, ) )
+            t.start()
+            t.join()
+
         else:
-            cmd_tokens=tokenize("python nls-log.py %s" % cmd)
             t = threading.Thread(target=nls_cmds.main,args=(cc, ) )
             t.start()
             t.join()
@@ -90,3 +98,4 @@ def main():
 
 if __name__=="__main__":
     main()
+
