@@ -19,7 +19,7 @@ def commandline():
     parser.add_option('-H', '--host', dest="hostname", default="127.0.0.1", help="host adress default is :17.0.0.1")
     parser.add_option('-P', '--port', dest="port", default=8000, help="port NO. default is 8000")
     parser.add_option("-D", '--debug', action="store_true", dest="debug", help="run with debug mode")
-    parser.add_option('-F', '--folder', dest="folder", default="/home/laxxu/testforflask", help="nls logs folder")
+    parser.add_option('-F', '--folder', dest="folder", default="/home", help="nls logs folder")
     return parser.parse_args()
 
 
@@ -171,7 +171,7 @@ def exe():
 def cd():
     global CUR_PATH
     global DEFAULT_PATH
-
+    tmppath = CUR_PATH
     path = request.args.get('path')
     if "~" in path:
         CUR_PATH = DEFAULT_PATH
@@ -180,6 +180,8 @@ def cd():
         CUR_PATH = "/".join(CUR_PATH.split('/')[0:-1])
     else:
         CUR_PATH = os.path.join(CUR_PATH, path)
+    if not os.path.exists(CUR_PATH):
+        CUR_PATH = tmppath
 
     app.logger.debug('Current Path %s', CUR_PATH)
     return CUR_PATH
@@ -251,8 +253,9 @@ def delete():
 if __name__ == "__main__":
     global CUR_PATH
     global DEFAULT_PATH
-    CUR_PATH = "~"
-    DEFAULT_PATH = "~"
+
+    DEFAULT_PATH = os.environ['HOME']
+    CUR_PATH = DEFAULT_PATH
 
     opt, args = commandline()
     app.logger.debug(opt)

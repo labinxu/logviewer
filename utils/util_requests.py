@@ -25,6 +25,7 @@ class UtilityRequests():
         self.domain = domain
         self.session = requests.Session()
         self.auth = None
+        self.status_code = None
 
     def setHeaders(self, headers):
         self.session.headers = headers
@@ -49,7 +50,9 @@ class UtilityRequests():
 
     def get(self, url):
         logger.debug('[+] Get: %s' % url)
-        return self.session.get(url, auth=self.auth, verify=False)
+        response = self.session.get(url, auth=self.auth, verify=False)
+        self.status_code = response.status_code
+        return response
 
     def getSoup(self, url):
         r = self.get(url)

@@ -61,6 +61,9 @@ def shell_loop():
             sys.stdout.write("\n"*100)
             sys.stdout.flush()
             continue
+        if cmd == 'exit':
+            sys.exit(0)
+
         cc = tokenize(cmd)
         ccmd = cc[0].lower()
         # local cmds like vi/vim /emacs
@@ -69,17 +72,14 @@ def shell_loop():
             t = threading.Thread(target=execute, args=(cc, ) )
             t.start()
             t.join()
-
-        # the complex command like find . | grep 
-        elif ccmd in nls_cmds.REMOTE_CMDS:
-            cc = ["remote_cmd", "%s"%cmd]
-            print(cc)
-            t = threading.Thread(target=nls_cmds.main, args=(cc, ) )
+        elif ccmd in nls_cmds.CMDS:
+            t = threading.Thread(target=nls_cmds.main,args=(cc, ) )
             t.start()
             t.join()
-
-        else:
-            t = threading.Thread(target=nls_cmds.main,args=(cc, ) )
+            # the complex command like find . | grep 
+        elif ccmd in nls_cmds.REMOTE_CMDS:
+            cc = ["remote_cmd", "%s"%cmd]
+            t = threading.Thread(target=nls_cmds.main, args=(cc, ) )
             t.start()
             t.join()
 
@@ -89,4 +89,3 @@ def main():
 
 if __name__=="__main__":
     main()
-

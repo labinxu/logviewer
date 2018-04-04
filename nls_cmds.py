@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+#coding: utf-8
 import os, sys, json
 import argparse
 from pprint import pprint
@@ -19,8 +19,27 @@ subparsers = parser.add_subparsers(title='subcommands',
                                        help='additional help',
                                        dest='subcmd')
 CMDS = []
-REMOTE_CMDS = ['find']
+REMOTE_CMDS = ['find', 'grep', 'awk', 'sed']
 LOCAL_CMDS = ['vi', 'vim']
+
+# config file for local and remote commands
+# remote commands will executed on remote server and return the output through http
+# local commands will executed on bash environment not nls_shell
+
+cmdconfig = os.path.join(os.environ['HOME'], ".nlscmds")
+if os.path.exists(cmdconfig):
+    with open(cmdconfig, 'r') as f:
+        data = json.loads(f.read())
+        REMOTE_CMDS = data['remote_cmds']
+        LOCAL_CMDS = data['local_cmds']
+else:
+    with open(cmdconfig, 'w') as f:
+        data = {}
+        data['remote_cmds'] = REMOTE_CMDS
+        data['local_cmds'] = LOCAL_CMDS
+        f.write(json.dumps(data))
+########################################################
+#end init commands
 
 def read_nls_info():
     with open(os.path.join(os.environ['HOME'],".nlslog"), 'r') as f:
@@ -98,8 +117,12 @@ def run_remote_cmd(cmd, args=None, node=None):
     data = None
     try:
         data = connector.getContent('%s%s'%(url, params))
+        if connector.status_code != 200:
+            logger.info("%s. status_code: %s" % (url, connector.status_code))
+            data = None
     except Exception as e:
         logger.error(str(e))
+
     return data
 
 
@@ -121,43 +144,92 @@ def NLSLOG_CMD(func):
     CMDS.append(func.__name__)
     cmdline = subparsers.add_parser(func.__name__)
     cmdline.add_argument('args', nargs="*", help=func.__doc__)
+    cmdline.add_argument('--all', action="store_true", dest="all", help="run the command on all nodes")
     cmdline.set_defaults(func=func)
     return func
 
 ############################################
 @NLSLOG_CMD
-def rm(args):
+def remove(args):
+    """remote files"""
     return post_from_node('rm', data=args.args)
+
+def __output(lines):
+    for l in lines:
+        print(l.encode('utf-8', errors='ignore'))
+
+def __do_ls(node=None):
+    node = NLSINFO["nls_active_node"] if not node else node
+    data = get_from_node("ls", node=node)
+    if not data:
+        return
+    jdata = json.loads(data)
+    print("NODE: %s" % node)
+    for key, files in jdata.iteritems():
+        __output(files.values())
+        break
 
 @NLSLOG_CMD
 def ls(args):
     """list the files in current folder"""
+    if not args.all:
+        return __do_ls()
+
 
     for n in NLSINFO['nls_nodes']:
-        data = get_from_node("ls", node=n)
-        if not data:
-            return
-        jdata = json.loads(data)
-        print("NODE: %s" % n)
-        for key, files in jdata.iteritems():
-            #nlsinfo['nls_pwd'] = key
-            for f in  files.values():
-                print(f)
-            break
+        __do_ls(node=n)
+        # data = get_from_node("ls", node=n)
+        # if not data:
+        #     return
+        # jdata = json.loads(data)
+        # print("NODE: %s" % n)
+        # for key, files in jdata.iteritems():
+        #     #nlsinfo['nls_pwd'] = key
+        #     for f in  files.values():
+        #         print(f)
+        #     break
 
 @NLSLOG_CMD
 def remote_cmd(args):
     """find command run on nodes"""
-    cmd = "exe"
     params = ' '.join(args.args)
-    data = run_remote_cmd(cmd, args=params)
-    for l in json.loads(data):
-        print(l)
+    # if not args.all:
+    #     data = run_remote_cmd('exe', args=params)
+    #     if not data:
+    #         return
+    #     print('%s:%s' % (NLSINFO['nls_active_node'], NLSINFO['nls_pwd']))
+    #     for l in json.loads(data):
+    #         print(l)
+    #     return
+
+    for n in NLSINFO["nls_nodes"]:
+        data = run_remote_cmd('exe', args=params, node=n)
+        if not data:
+            continue
+
+        print('%s:%s' % (n, NLSINFO['nls_pwd']))
+        __output(json.loads(data))
 
 @NLSLOG_CMD
 def nodes(args):
     for i, n in enumerate(NLSINFO['nls_nodes']):
         print("[%s]: %s" % (i, n))
+
+@NLSLOG_CMD
+def rmnode(args):
+    newnode = args.args
+    if newnode:
+        newnode = newnode[0]
+        nodes =  NLSINFO['nls_nodes']
+        if newnode.isdigit():
+            if len(nodes) > int(newnode):
+                del(NLSINFO['nls_nodes'][int(newnode)])
+                NLSINFO['nls_active_node'] = NLSINFO['nls_nodes'][0]
+            else:
+                print('index out of nodes number')
+        else:
+            NLSINFO['nls_nodes'].remove(newnode)
+            NLSINFO['nls_active_node'] = NLSINFO[0]
 
 @NLSLOG_CMD
 def node(args):
@@ -166,14 +238,22 @@ def node(args):
     if newnode:
         newnode = newnode[0]
         nodes =  NLSINFO['nls_nodes']
-        if newnode.isdigit() and len(nodes) > int(newnode):
-            NLSINFO['nls_active_node'] = nodes[int(newnode)]
+        if newnode.isdigit():
+            if len(nodes) > int(newnode):
+                NLSINFO['nls_active_node'] = nodes[int(newnode)]
+            else:
+                print('index out of nodes number')
         else:
             NLSINFO['nls_active_node'] = newnode
             if newnode not in NLSINFO['nls_nodes']:
                 NLSINFO['nls_nodes'].append(newnode)
 
-    print(NLSINFO['nls_active_node'])
+    res = get_from_node('pwd')
+    if not res:
+        return
+    NLSINFO['nls_pwd'] = res
+    print("%s:%s" % (NLSINFO['nls_active_node'], res))
+
 
 @NLSLOG_CMD
 def cp(args):
@@ -223,7 +303,6 @@ def cd(args):
         return
     NLSINFO['nls_pwd'] = curpath
     logger.debug('PWD %s' %  NLSINFO['nls_pwd'])
-    #write_nls_info(json.dumps(NLSINFO))
 
 global NLSINFO
 NLSINFO = init_nls_info()
