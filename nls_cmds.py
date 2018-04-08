@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 #coding: utf-8
 import os, sys, json
+import multiprocessing as mp
+from multiprocessing import Manager
+
 import argparse
 from pprint import pprint
 from utils.util_requests import UtilityRequests
-import logging
-import atexit
+import nodemanager
+import logging, threading
+import atexit, time
 
 ### global variables
 global NLSINFO
@@ -42,6 +46,7 @@ else:
 #end init commands
 
 def read_nls_info():
+    NLSINFO = {}
     with open(os.path.join(os.environ['HOME'],".nlslog"), 'r') as f:
         data = json.loads(f.read())
         if isinstance(data, unicode):
@@ -49,7 +54,10 @@ def read_nls_info():
         if isinstance(data['nls_nodes'], unicode):
             data['nls_nodes'] = json.loads(data['nls_nodes'])
 
-        return data
+        NLSINFO['nls_nodes'] = data['nls_nodes']
+        NLSINFO['nls_pwd'] = data['nls_pwd']
+        NLSINFO['nls_active_node'] = data['nls_active_node']
+        return NLSINFO
 
 def write_nls_info(data=None):
     data = json.dumps(data)
@@ -57,12 +65,61 @@ def write_nls_info(data=None):
         f.write(data)
         f.flush()
 
+
+pipe_name = '/tmp/nls_master'
+global master_pipe
+
+global nodemanager_p
+global register_p
+global register_lock
+global POLLING
+
+def register(NLSINFO, pipe_name, lock, polling):
+    global master_pipe
+
+    master_pipe = os.open(pipe_name, os.O_RDONLY)
+    line = ''
+    while polling:
+        line += os.read(master_pipe, 128)
+        line = line.strip()
+        if not line:
+            time.sleep(1)
+            continue
+
+        if line[-1] != ';':
+            linedata = [l for l in line.split(';')[0:-1] if l != '']
+        else:
+            linedata = [l for l in line.split(';') if l != '']
+
+        for l in linedata:
+
+            if l not in NLSINFO['nls_nodes']:
+                print('add new node %s' % l)
+                lock.acquire()
+                NLSINFO['nls_nodes'].append(l)
+                lock.release()
+
+def start_register():
+    if not os.path.exists(pipe_name):
+        os.mkfifo(pipe_name)
+
+    global nodemanager_p
+    global register_p
+    global register_lock
+    global POLLING
+    # nodemanager_p = mp.Process(target=nodemanager.main)
+    # nodemanager_p.start()
+
+    register_lock = threading.Lock()
+    register_p = threading.Thread(target=register, args=(NLSINFO, pipe_name, register_lock, POLLING))
+    register_p.start()
+###############################################################
+
 def init_nls_info(node=None):
     if not node:
         nls_run_info = read_nls_info()
         nodes = nls_run_info['nls_nodes']
         url = nls_run_info["nls_active_node"]
-        # get the default pwd
         pwd = ''
         try:
             pwd = connector.getContent(os.path.join(url, "pwd"))
@@ -124,8 +181,6 @@ def run_remote_cmd(cmd, args=None, node=None):
         logger.error(str(e))
 
     return data
-
-
 
 def post_from_node(cmd, data):
     url = os.path.join(NLSINFO["nls_active_node"], cmd)
@@ -191,17 +246,8 @@ def ls(args):
 
 @NLSLOG_CMD
 def remote_cmd(args):
-    """find command run on nodes"""
+    """these commands that will running on nodes"""
     params = ' '.join(args.args)
-    # if not args.all:
-    #     data = run_remote_cmd('exe', args=params)
-    #     if not data:
-    #         return
-    #     print('%s:%s' % (NLSINFO['nls_active_node'], NLSINFO['nls_pwd']))
-    #     for l in json.loads(data):
-    #         print(l)
-    #     return
-
     for n in NLSINFO["nls_nodes"]:
         data = run_remote_cmd('exe', args=params, node=n)
         if not data:
@@ -212,8 +258,10 @@ def remote_cmd(args):
 
 @NLSLOG_CMD
 def nodes(args):
+    register_lock.acquire()
     for i, n in enumerate(NLSINFO['nls_nodes']):
         print("[%s]: %s" % (i, n))
+    register_lock.release()
 
 @NLSLOG_CMD
 def rmnode(args):
@@ -245,8 +293,10 @@ def node(args):
                 print('index out of nodes number')
         else:
             NLSINFO['nls_active_node'] = newnode
+            register_lock.acquire()
             if newnode not in NLSINFO['nls_nodes']:
                 NLSINFO['nls_nodes'].append(newnode)
+            register_lock.release()
 
     res = get_from_node('pwd')
     if not res:
@@ -282,7 +332,9 @@ def addnode(args):
     """add nodes"""
     node = args.args[0]
     if node:
+        register_lock.acquire()
         NLSINFO['nls_nodes'].append(node)
+        register_lock.release()
         #write_nls_info(NLSINFO)
     nodes(args)
 
@@ -304,14 +356,31 @@ def cd(args):
     NLSINFO['nls_pwd'] = curpath
     logger.debug('PWD %s' %  NLSINFO['nls_pwd'])
 
-global NLSINFO
 NLSINFO = init_nls_info()
 logger.info("Nls_cmds inited")
+POLLING = True
+start_register()
 
 @atexit.register
 def onexit():
+    global master_pipe
     logger.info("Store the nlsinfo.")
+    register_lock.acquire()
     write_nls_info(NLSINFO)
+    register_lock.release()
+
+    if register_p.is_alive():
+        register_p.terminate()
+
+    if nodemanager_p.is_alive():
+        nodemanager_p.terminate()
+
+    os.close(master_pipe)
+
+def quit():
+    global POLLING
+    POLLING = False
+    sys.exit(0)
 
 def main(args=None):
     if args:

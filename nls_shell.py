@@ -15,6 +15,11 @@ nls_run_info = {
 }
 
 def init_nodes():
+    nlsnodes = os.path.join(os.environ['HOME'],".nlsnodes")
+    if not os.path.exists(nlsnodes):
+        nls_run_info['nls_nodes'].append('http://127.0.0.1:8000')
+        return
+
     with open(os.path.join(os.environ['HOME'],".nlsnodes")) as f:
         for l in f.readlines():
             nls_run_info['nls_nodes'].append(l.strip())
@@ -61,11 +66,19 @@ def shell_loop():
             sys.stdout.write("\n"*100)
             sys.stdout.flush()
             continue
-        if cmd == 'exit':
-            sys.exit(0)
+        if cmd == 'exit' or cmd=='quit':
+            status = SHELL_STATUS_STOP
+            
+            os._exit(0)
 
         cc = tokenize(cmd)
         ccmd = cc[0].lower()
+        if ccmd in ['?', '-h', '--help']:
+            t = threading.Thread(target=nls_cmds.main,args=(cc, ) )
+            t.start()
+            t.join()
+            continue
+
         # local cmds like vi/vim /emacs
         if ccmd in nls_cmds.LOCAL_CMDS:
             cmd_tokens = tokenize(cmd)
@@ -82,6 +95,8 @@ def shell_loop():
             t = threading.Thread(target=nls_cmds.main, args=(cc, ) )
             t.start()
             t.join()
+        else:
+            print("%s is not the nls_log command!")
 
 def main():
     shell_loop()

@@ -6,19 +6,24 @@ from flask import Flask, request, make_response, redirect, url_for
 import mimetypes, json, os
 import zipfile, time
 import optparse
-
+from utils import util_requests
+import multiprocessing as mp
 
 app = Flask(__name__)
-
 global CUR_PATH
 global DEFAULT_PATH
-
 
 def commandline():
     parser = optparse.OptionParser()
     parser.add_option('-H', '--host', dest="hostname", default="127.0.0.1", help="host adress default is :17.0.0.1")
     parser.add_option('-P', '--port', dest="port", default=8000, help="port NO. default is 8000")
+
+    parser.add_option('-m', '--master', dest="master", default='127.0.0.1', help="master ip")
+    parser.add_option('-p', '--mport', dest="mport", default=8800, help="master regist port")
+    parser.add_option('-t', '--interval', dest="interval", default=60, help="polling time interval")
+
     parser.add_option("-D", '--debug', action="store_true", dest="debug", help="run with debug mode")
+
     parser.add_option('-F', '--folder', dest="folder", default="/home", help="nls logs folder")
     return parser.parse_args()
 
@@ -249,6 +254,12 @@ def delete():
         pass
     return list()
 
+def register_polling(master_addr, master_port, port, interval):
+    request = util_requests.UtilityRequests()
+    url = 'http://{0}:{1}/register?port={2}'.format(master_addr, master_port, port)
+    while True:
+        resp_content = request.getContent(url)
+        time.sleep(interval)
 
 if __name__ == "__main__":
     global CUR_PATH
@@ -261,5 +272,7 @@ if __name__ == "__main__":
     app.logger.debug(opt)
     CUR_PATH = opt.folder
     DEFAULT_PATH = opt.folder
+    p = mp.Process(target=register_polling, args=(opt.master, opt.mport, opt.port, int(opt.interval)))
+    p.start()
     app.run(host=opt.hostname, port=int(opt.port), debug=opt.debug)
 
