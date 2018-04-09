@@ -2,6 +2,7 @@ import sys, subprocess
 import shlex, json
 import os, json
 import threading
+import optparse, logging
 
 # from evdev import InputDevice
 # from select import select
@@ -13,6 +14,16 @@ nls_run_info = {
     'nls_pwd':'',
     'nls_nodes':[]
 }
+###
+
+def commandline():
+    parser = optparse.OptionParser()
+    parser.add_option('-l', '--log', dest="logpath", default="/tmp/nlslogtrans.log", help="path of the nls log transfer")
+    parser.add_option("-d", '--debug', action="store_true", dest="debug", help="log level debug,if not set the log level is error")
+    parser.add_option("-w", '--warning', action="store_true", dest="warning", help="log level warning,if not set the log level is error")
+
+    return parser.parse_args()
+
 
 def init_nodes():
     nlsnodes = os.path.join(os.environ['HOME'],".nlsnodes")
@@ -56,7 +67,7 @@ def execute(cmd_tokens):
 def shell_loop():
     status=SHELL_STATUS_RUN
     while status==SHELL_STATUS_RUN:
-        sys.stdout.write('>> ')
+        sys.stdout.write('nls-log>>')
         sys.stdout.flush()
         cmd=sys.stdin.readline()
         cmd = cmd.strip()
@@ -68,7 +79,6 @@ def shell_loop():
             continue
         if cmd == 'exit' or cmd=='quit':
             status = SHELL_STATUS_STOP
-            
             os._exit(0)
 
         cc = tokenize(cmd)
@@ -92,15 +102,31 @@ def shell_loop():
             # the complex command like find . | grep 
         elif ccmd in nls_cmds.REMOTE_CMDS:
             cc = ["remote_cmd", "%s"%cmd]
-            t = threading.Thread(target=nls_cmds.main, args=(cc, ) )
+            t = threading.Thread(target=nls_cmds.main, args=(cc
+, ) )
             t.start()
             t.join()
         else:
             print("%s is not the nls_log command!")
 
 def main():
-    shell_loop()
+    opt, var = commandline()
 
+    ### the logger config
+    fh = logging.FileHandler(opt.logpath)
+
+    if opt.debug:
+        nls_cmds.logger.setLevel(logging.DEBUG)
+        fh.setLevel(logging.DEBUG)
+    elif opt.warning:
+        nls_cmds.logger.setLevel(logging.WARNING)
+        fh.setLevel(logging.WARNING)
+    else:
+        nls_cmds.logger.setLevel(logging.ERROR)
+        fh.setLevel(logging.ERROR)
+    nls_cmds.logger.addHandler(fh)
+    # enter the shell loop
+    shell_loop()
 
 if __name__=="__main__":
     main()

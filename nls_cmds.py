@@ -1,15 +1,40 @@
 #!/usr/bin/env python
 #coding: utf-8
+
+"""
+nls_cmds module include a thread for node register
+nls commands:
+cd ls node remove etc,
+usage: ./nls_shell
+--help
+:::::
+
+usage: nls-log [-h]
+               {remove,ls,remote_cmd,nodes,rmnode,node,cp,addnode,pwd,cd} ...
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+subcommands:
+  valid subcommands
+
+  {remove,ls,remote_cmd,nodes,rmnode,node,cp,addnode,pwd,cd}
+                        additional help
+"""
+
+
 import os, sys, json
 import multiprocessing as mp
 from multiprocessing import Manager
 
 import argparse
-from pprint import pprint
+#!/usr/bin/env python
+
 from utils.util_requests import UtilityRequests
 import nodemanager
 import logging, threading
-import atexit, time
+import atexit, time, signal
+
 
 ### global variables
 global NLSINFO
@@ -44,6 +69,18 @@ else:
         f.write(json.dumps(data))
 ########################################################
 #end init commands
+
+
+###########################################
+#signal handle
+
+def sigint_handler(signum, frame):
+    os._exit(0)
+
+signal.signal(signal.SIGINT, sigint_handler)
+signal.signal(signal.SIGHUP, sigint_handler)
+signal.signal(signal.SIGTERM, sigint_handler)
+####
 
 def read_nls_info():
     NLSINFO = {}
@@ -94,7 +131,7 @@ def register(NLSINFO, pipe_name, lock, polling):
         for l in linedata:
 
             if l not in NLSINFO['nls_nodes']:
-                print('add new node %s' % l)
+                logger.info('add new node %s' % l)
                 lock.acquire()
                 NLSINFO['nls_nodes'].append(l)
                 lock.release()
@@ -233,16 +270,6 @@ def ls(args):
 
     for n in NLSINFO['nls_nodes']:
         __do_ls(node=n)
-        # data = get_from_node("ls", node=n)
-        # if not data:
-        #     return
-        # jdata = json.loads(data)
-        # print("NODE: %s" % n)
-        # for key, files in jdata.iteritems():
-        #     #nlsinfo['nls_pwd'] = key
-        #     for f in  files.values():
-        #         print(f)
-        #     break
 
 @NLSLOG_CMD
 def remote_cmd(args):
@@ -272,12 +299,20 @@ def rmnode(args):
         if newnode.isdigit():
             if len(nodes) > int(newnode):
                 del(NLSINFO['nls_nodes'][int(newnode)])
-                NLSINFO['nls_active_node'] = NLSINFO['nls_nodes'][0]
+                try:
+                    NLSINFO['nls_active_node'] = NLSINFO['nls_nodes'][0]
+                except Exception as e:
+                    logger.warning(str(e))
+                    NLSINFO['nls_active_node'] = None
+
             else:
                 print('index out of nodes number')
         else:
-            NLSINFO['nls_nodes'].remove(newnode)
-            NLSINFO['nls_active_node'] = NLSINFO[0]
+            if newnode in NLSINFO['nls_nodes']:
+                NLSINFO['nls_nodes'].remove(newnode)
+                NLSINFO['nls_active_node'] = NLSINFO[0]
+            else:
+                logger.warning('%s not in the node list' % newnode)
 
 @NLSLOG_CMD
 def node(args):

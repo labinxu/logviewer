@@ -5,7 +5,7 @@ import subprocess, flask, time
 from flask import Flask, request, make_response, redirect, url_for
 import mimetypes, json, os
 import zipfile, time
-import optparse
+import optparse,logging
 from utils import util_requests
 import multiprocessing as mp
 
@@ -25,6 +25,8 @@ def commandline():
     parser.add_option("-D", '--debug', action="store_true", dest="debug", help="run with debug mode")
 
     parser.add_option('-F', '--folder', dest="folder", default="/home", help="nls logs folder")
+
+    parser.add_option('-l', '--log', dest='logpath', default='/tmp/nlslogmanager.log', help='the log path')
     return parser.parse_args()
 
 
@@ -163,7 +165,7 @@ def show():
 
 @app.route("/pwd", methods=["GET"])
 def pwd():
-    print("CUR_PATH %s" % CUR_PATH)
+    app.logger.debug("CUR_PATH %s" % CUR_PATH)
     return CUR_PATH
 
 @app.route("/exe", methods=["GET"])
@@ -185,7 +187,9 @@ def cd():
         CUR_PATH = "/".join(CUR_PATH.split('/')[0:-1])
     else:
         CUR_PATH = os.path.join(CUR_PATH, path)
-    if not os.path.exists(CUR_PATH):
+
+    if not (os.path.isdir(CUR_PATH)) or (not os.path.exists(CUR_PATH)):
+        app.logger.warning('Path %s is not a directory or not exists', CUR_PATH)
         CUR_PATH = tmppath
 
     app.logger.debug('Current Path %s', CUR_PATH)
@@ -258,8 +262,12 @@ def register_polling(master_addr, master_port, port, interval):
     request = util_requests.UtilityRequests()
     url = 'http://{0}:{1}/register?port={2}'.format(master_addr, master_port, port)
     while True:
-        resp_content = request.getContent(url)
-        time.sleep(interval)
+        try:
+            resp_content = request.getContent(url)
+        except Exception as e:
+            app.logger.error(str(e))
+        finally:
+            time.sleep(interval)
 
 if __name__ == "__main__":
     global CUR_PATH
@@ -269,7 +277,15 @@ if __name__ == "__main__":
     CUR_PATH = DEFAULT_PATH
 
     opt, args = commandline()
-    app.logger.debug(opt)
+
+    loghandler = logging.FileHandler(opt.logpath)
+    if opt.debug:
+        loghandler.setLevel(logging.DEBUG)
+    else:
+        loghandler.setLevel(logging.WARNING)
+    app.logger.addHandler(loghandler)
+    util_requests.logger = app.logger
+
     CUR_PATH = opt.folder
     DEFAULT_PATH = opt.folder
     p = mp.Process(target=register_polling, args=(opt.master, opt.mport, opt.port, int(opt.interval)))
