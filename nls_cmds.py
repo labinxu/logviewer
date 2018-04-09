@@ -415,7 +415,7 @@ def onexit():
 def quit():
     global POLLING
     POLLING = False
-    sys.exit(0)
+    os._exit(0)
 
 def main(args=None):
     if args:

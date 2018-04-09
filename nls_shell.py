@@ -92,25 +92,28 @@ def shell_loop():
         # local cmds like vi/vim /emacs
         if ccmd in nls_cmds.LOCAL_CMDS:
             cmd_tokens = tokenize(cmd)
-            t = threading.Thread(target=execute, args=(cc, ) )
+            t = threading.Thread(target=execute, args=(cc, ))
             t.start()
             t.join()
         elif ccmd in nls_cmds.CMDS:
-            t = threading.Thread(target=nls_cmds.main,args=(cc, ) )
+            t = threading.Thread(target=nls_cmds.main,args=(cc, ))
             t.start()
             t.join()
             # the complex command like find . | grep 
         elif ccmd in nls_cmds.REMOTE_CMDS:
             cc = ["remote_cmd", "%s"%cmd]
-            t = threading.Thread(target=nls_cmds.main, args=(cc
-, ) )
+            t = threading.Thread(target=nls_cmds.main, args=(cc, ) )
             t.start()
             t.join()
         else:
             print("%s is not the nls_log command!")
 
 def main():
-    opt, var = commandline()
+    try:
+        opt, var = commandline()
+        print(opt, var)
+    except SystemExit as e:
+        os._exit(0)
 
     ### the logger config
     fh = logging.FileHandler(opt.logpath)
