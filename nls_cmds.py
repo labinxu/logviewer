@@ -110,6 +110,27 @@ global nodemanager_p
 global register_p
 global register_lock
 global POLLING
+global polling_interval
+
+def nodemonitor(NLSINFO, interval, lock):
+    '''monitor the node and remove it if disconnected'''
+
+    while True:
+        lock.acquire()
+        for n in NLSINFO['nls_nodes']:
+            url = "%s/%s" % (n, 'polling')
+            try:
+                connector.getContent(url)
+            except Exception as e:
+                NLSINFO['nls_nodes'].remove(n)
+        lock.release()
+        time.sleep(interval)
+
+def start_monitor():
+    global polling_interval
+    global register_lock
+    t = threading.Thread(target=nodemonitor, args=(NLSINFO, polling_interval, register_lock))
+    t.start()
 
 def register(NLSINFO, pipe_name, lock, polling):
     global master_pipe
@@ -392,9 +413,11 @@ def cd(args):
     logger.debug('PWD %s' %  NLSINFO['nls_pwd'])
 
 NLSINFO = init_nls_info()
+polling_interval = 240
 logger.info("Nls_cmds inited")
 POLLING = True
 start_register()
+start_monitor()
 
 @atexit.register
 def onexit():

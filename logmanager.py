@@ -112,6 +112,10 @@ def showfile():
     path = request.args.get('path')
     act = request.args.get('act')
 
+@app.route("/polling", methods=["GET"])
+def polling():
+    return 'ok'
+
 def exec_for_log(cmd):
     app.logger.debug(cmd)
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
@@ -252,8 +256,7 @@ def delete():
     delete_cmd = "rm -rf %s" % " ".join(files)
     app.logger.warning(delete_cmd)
     try:
-        pass
-        #exec_with_status(delete_cmd)
+        exec_with_status(delete_cmd)
     except Exception as e:
         pass
     return list()

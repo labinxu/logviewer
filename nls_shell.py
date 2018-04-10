@@ -21,6 +21,7 @@ def commandline():
     parser.add_option('-l', '--log', dest="logpath", default="/tmp/nlslogtrans.log", help="path of the nls log transfer")
     parser.add_option("-d", '--debug', action="store_true", dest="debug", help="log level debug,if not set the log level is error")
     parser.add_option("-w", '--warning', action="store_true", dest="warning", help="log level warning,if not set the log level is error")
+    parser.add_option("-i", '--interval', dest='interval', default=240, help='node heartbeat intervaltime default is 240')
 
     return parser.parse_args()
 
@@ -106,12 +107,11 @@ def shell_loop():
             t.start()
             t.join()
         else:
-            print("%s is not the nls_log command!")
+            print("%s is not the nls_log command!" % ccmd)
 
 def main():
     try:
         opt, var = commandline()
-        print(opt, var)
     except SystemExit as e:
         os._exit(0)
 
@@ -128,6 +128,7 @@ def main():
         nls_cmds.logger.setLevel(logging.ERROR)
         fh.setLevel(logging.ERROR)
     nls_cmds.logger.addHandler(fh)
+    nls_cmds.polling_time = int(opt.interval)
     # enter the shell loop
     shell_loop()
 
